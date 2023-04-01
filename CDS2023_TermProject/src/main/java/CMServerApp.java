@@ -33,6 +33,16 @@ public class CMServerApp {
     public CMServerStub getServerStub() { return m_serverStub; }
     public CMServerEventHandler getServerEventHandler() { return m_eventHandler; }
 
+    public void printAllMenu() {
+        System.out.println("---------- Menu ----------");
+        System.out.println("1. Display currently logged-in users.");
+        System.out.println("2. ");
+    }
+
+    public void processInput(String strInput) {
+
+    }
+
     public static void main(String[] args) {
         CMServerApp server = new CMServerApp();
         CMServerStub cmStub = server.getServerStub();

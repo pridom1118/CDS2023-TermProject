@@ -14,6 +14,11 @@ public class CMClientApp {
     public CMClientStub getClientStub() { return m_clientStub; }
     public CMClientEventHandler getClientEventHandler() { return m_eventHandler; }
 
+    public void printAllMenu() {
+        System.out.println("---------- Menu ----------");
+        System.out.println("1. ");
+    }
+
     public static void main(String[] args) {
         Scanner scan = new Scanner(System.in);
         CMClientApp client = new CMClientApp();
@@ -32,7 +37,7 @@ public class CMClientApp {
         }
 
         /* login CM Server */
-        String user_id, user_pw;
+        String user_id, user_pw, user_input;
         System.out.println("Input ID: ");
         user_id = scan.nextLine();
         System.out.println("Input PW: ");
@@ -46,6 +51,11 @@ public class CMClientApp {
         }
         /* wait before executing next API */
         System.out.println("Press Enter to execute next API");
-        scan.nextLine();
+        user_input = scan.nextLine();
+
+        if(user_input.equals("exit")) {
+            clientStub.logoutCM();
+            clientStub.terminateCM();
+        }
     }
 }

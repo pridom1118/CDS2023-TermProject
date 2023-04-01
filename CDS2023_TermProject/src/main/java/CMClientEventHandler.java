@@ -15,6 +15,9 @@ public class CMClientEventHandler implements CMAppEventHandler {
             case CMInfo.CM_SESSION_EVENT:
                 processSessionEvent(cme);
                 break;
+            case CMInfo.CM_DATA_EVENT:
+                processDataEvent(cme);
+                break;
             default:
                 return;
         }
@@ -31,8 +34,26 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 else
                     System.out.println("This client successfully logs in to the default server.");
                 break;
-            case CMSessionEvent.SESSION_ADD_USER:
-                System.out.println(se.getUserName() + " just logged in.");
+            case CMSessionEvent.UNEXPECTED_SERVER_DISCONNECTION:
+                System.out.println("Unexpected disconnection from [" + se.getChannelName() + "].");
+                break;
+            case CMSessionEvent.INTENTIONALLY_DISCONNECT:
+                System.out.println("Intentionally disconnected from the channel.");
+                break;
+            default:
+                return;
+        }
+    }
+
+    private void processDataEvent(CMEvent cme) {
+        CMDataEvent de = (CMDataEvent) cme;
+
+        switch(de.getID()) {
+            case CMDataEvent.NEW_USER:
+                System.out.println("["+de.getUserName()+"] enters group("+de.getHandlerGroup()+") in session("+de.getHandlerSession()+").");
+                break;
+            case CMDataEvent.REMOVE_USER:
+                System.out.println("["+de.getUserName()+"] leaves group("+de.getHandlerGroup()+") in session("+de.getHandlerSession()+").");
                 break;
             default:
                 return;

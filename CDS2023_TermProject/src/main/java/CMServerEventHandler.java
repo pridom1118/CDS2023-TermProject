@@ -28,6 +28,12 @@ public class CMServerEventHandler implements CMAppEventHandler {
             case CMSessionEvent.LOGIN:
                 System.out.println("[" + se.getUserName() + "] requests login.");
                 break;
+            case CMSessionEvent.LOGOUT:
+                System.out.println("[" + se.getUserName() + "] logs out.");
+                break;
+            case CMSessionEvent.INTENTIONALLY_DISCONNECT:
+                System.out.println("[" + se.getUserName() + "] just intentionally disconnected from the server.");
+                break;
             default:
                 return;
         }
