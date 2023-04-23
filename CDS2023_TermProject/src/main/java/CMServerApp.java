@@ -21,6 +21,10 @@ import kr.ac.konkuk.ccslab.cm.manager.CMMqttManager;
 import kr.ac.konkuk.ccslab.cm.sns.CMSNSUserAccessSimulator;
 import kr.ac.konkuk.ccslab.cm.stub.CMServerStub;
 
+import java.nio.file.Paths;
+import java.util.Vector;
+import java.util.*;
+
 public class CMServerApp {
     private CMServerStub m_serverStub;
     private CMServerEventHandler m_eventHandler;
@@ -36,11 +40,85 @@ public class CMServerApp {
     public void printAllMenu() {
         System.out.println("---------- Menu ----------");
         System.out.println("1. Display currently logged-in users.");
-        System.out.println("2. ");
+        System.out.println("---------- File Transfer ----------");
+        System.out.println("2. Set file path.");
+        System.out.println("3. Request file.");
+        System.out.println("4. Push file.");
+        System.out.println("5. Cancel receiving the file.");
+        System.out.println("6. Cancel sending the file.");
+        System.out.println("7. Print sending / requesting the file");
+        System.out.println("------------------------------");
+        System.out.println("999: TerminateCM.");
+    }
+
+    public void printLoginUsers() {
+        System.out.println("=============== USER LIST ===============");
+        CMMember loginUsers = m_serverStub.getLoginUsers();
+        if(loginUsers == null) {
+            System.err.println("There are no users online.");
+            return;
+        }
+        System.out.println("Currently " + loginUsers.getMemberNum() + " users are online.");
+        Vector<CMUser> loginUserVector = loginUsers.getAllMembers();
+        Iterator<CMUser> iter = loginUserVector.iterator();
+
+        System.out.println("==============================");
+        while(iter.hasNext()) {
+            CMUser user = iter.next();
+            System.out.println(user.getName());
+        }
+        System.out.println("==============================");
+    }
+
+    public void setFilePath() {
+        String strPath = null;
+        Scanner scan_path = new Scanner(System.in);
+        strPath = scan_path.nextLine();
+        m_serverStub.setTransferedFileHome(Paths.get(strPath));
+        System.out.println("Set file path to " + strPath);
+    }
+
+    public void requestFile() {
+
+    }
+
+    public void pushFile() {
+
+    }
+
+    public void cancelRecvFile() {
+
+    }
+
+    public void cancelSendFile() {
+
+    }
+
+    public void printSendRecvFileInfo() {
+
     }
 
     public void processInput(String strInput) {
+        int nCommand = -1;
+        try {
+            nCommand = Integer.parseInt(strInput);
+        } catch (NumberFormatException e) {
+            System.out.println("Wrong input");
+            return;
+        }
 
+        switch(nCommand) {
+            case 0:
+                printAllMenu();
+                break;
+            case 999:
+                m_serverStub.terminateCM();
+                break;
+            case 1:
+                printLoginUsers();
+                break;
+            case 2:
+        }
     }
 
     public static void main(String[] args) {
