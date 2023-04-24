@@ -106,6 +106,13 @@ public class CMClientApp extends JFrame {
         }
     }
 
+    private void stopCM() {
+        m_clientStub.terminateCM();
+        printMessage("Client CM terminates.\n");
+        initializeButtons();
+        setTitle("CM Client");
+    }
+
     private void addStylesToDocument(StyledDocument doc) {
         Style defStyle = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
 
@@ -170,11 +177,19 @@ public class CMClientApp extends JFrame {
             case CMInfo.CM_SESSION_JOIN:
                 m_startStopButton.setText("Stop CM Client");
                 m_loginLogoutButton.setText("Logout");
+                break;
             default:
                 m_startStopButton.setText("Start CM Client");
                 m_loginLogoutButton.setText("Login");
                 break;
         }
+        revalidate();
+        repaint();
+    }
+
+    private void initializeButtons() {
+        m_startStopButton.setText("Start Client CM");
+        m_loginLogoutButton.setText("Login");
         revalidate();
         repaint();
     }
@@ -250,6 +265,7 @@ public class CMClientApp extends JFrame {
             if(ret) System.out.println("successfully sent the login request.\n");
             else System.out.println("failed to send the login request.\n");
         }
+
     }
 
     private void requestAttachedFile(String strFileName) {
@@ -444,7 +460,7 @@ public class CMClientApp extends JFrame {
         public void actionPerformed(ActionEvent e) {
             JButton button = (JButton)e.getSource();
             if(button.getText().equals("Start CM Client")) startCM();
-            //else if(button.getText().equals("Stop CM Cilent")) stopCM();
+            else if(button.getText().equals("Stop CM Cilent")) stopCM();
             else if(button.getText().equals("Login")) requestLogin();
             //else if(button.getText().equals("Logout")) requestLogout();
 
