@@ -1,4 +1,8 @@
+import kr.ac.konkuk.ccslab.cm.entity.CMList;
+import kr.ac.konkuk.ccslab.cm.entity.CMRecvFileInfo;
+import kr.ac.konkuk.ccslab.cm.entity.CMSendFileInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMConfigurationInfo;
+import kr.ac.konkuk.ccslab.cm.info.CMFileTransferInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMInteractionInfo;
 import kr.ac.konkuk.ccslab.cm.manager.CMCommManager;
@@ -11,7 +15,10 @@ import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Hashtable;
 import java.util.List;
+import java.util.Set;
+
 public class CMClientApp extends JFrame {
     private JTextPane m_outTextPane;
     private JTextField m_inTextField;
@@ -23,6 +30,9 @@ public class CMClientApp extends JFrame {
     private JButton m_loginLogoutButton;
     private JButton m_clientFolderButton;
     private JButton m_serverFolderButton;
+
+    private JFrame m_clientWindow;
+    private JFrame m_serverWindow;
 
     public CMClientApp() {
         MyKeyListener cmKeyListener = new MyKeyListener();
@@ -62,6 +72,14 @@ public class CMClientApp extends JFrame {
         m_loginLogoutButton.setEnabled(false);
         topButtonPanel.add(m_loginLogoutButton);
 
+        m_clientFolderButton = new JButton("Client Folder");
+        m_clientFolderButton.addActionListener(cmActionListener);
+        m_clientFolderButton.setEnabled(false);
+
+        m_serverFolderButton = new JButton("Server Folder");
+        m_serverFolderButton.addActionListener(cmActionListener);
+        m_serverFolderButton.setEnabled(false);
+
         setVisible(true);
         m_clientStub = new CMClientStub();
         m_eventHandler = new CMClientEventHandler(m_clientStub, this);
@@ -100,6 +118,8 @@ public class CMClientApp extends JFrame {
         } else {
             m_startStopButton.setEnabled(true);
             m_loginLogoutButton.setEnabled(true);
+            m_clientFolderButton.setEnabled(true);
+            m_serverFolderButton.setEnabled(true);
             printStyledMessage("Client CM starts.\n", "bold");
             printStyledMessage("Type \"0\" for menu.\n", "regular");
             setButtonsAccordingToClientState();
@@ -190,6 +210,8 @@ public class CMClientApp extends JFrame {
     private void initializeButtons() {
         m_startStopButton.setText("Start Client CM");
         m_loginLogoutButton.setText("Login");
+        m_clientFolderButton.setEnabled(false);
+        m_serverFolderButton.setEnabled(false);
         revalidate();
         repaint();
     }
@@ -239,7 +261,7 @@ public class CMClientApp extends JFrame {
                 pullFile();
                 break;
             case 5:
-                //printCurrentFileInfo();
+                printCurrentFileInfo();
                 break;
             default:
                 System.err.println("Wrong Input.");
@@ -393,6 +415,41 @@ public class CMClientApp extends JFrame {
         printMessage("------------------------");
     }
 
+    public void printCurrentFileInfo() {
+        CMFileTransferInfo fInfo = m_clientStub.getCMInfo().getFileTransferInfo();
+        Hashtable<String, CMList<CMSendFileInfo>> sendHashtable = fInfo.getSendFileHashtable();
+        Hashtable<String, CMList<CMRecvFileInfo>> recvHashtable = fInfo.getRecvFileHashtable();
+        Set<String> sendKeySet = sendHashtable.keySet();
+        Set<String> recvKeySet = recvHashtable.keySet();
+
+        printMessage("==== sending file info\n");
+        for(String receiver : sendKeySet)
+        {
+            CMList<CMSendFileInfo> sendList = sendHashtable.get(receiver);
+            printMessage(sendList+"\n");
+        }
+
+        printMessage("==== receiving file info\n");
+        for(String sender : recvKeySet)
+        {
+            CMList<CMRecvFileInfo> recvList = recvHashtable.get(sender);
+            printMessage(recvList+"\n");
+        }
+    }
+
+    private void openClientFolder() {
+        m_clientWindow = new JFrame();
+        m_clientWindow.setSize(600, 600);
+        m_clientWindow.setDefaultCloseOperation(EXIT_ON_CLOSE);
+        m_clientWindow.setTitle("Client Window [" + m_clientStub.getMyself().getName() + "]");
+
+        JPanel panel = new JPanel();
+    }
+
+    private void openServerFolder() {
+
+    }
+
     public class MyKeyListener implements KeyListener {
         public void keyPressed(KeyEvent e) {
             int key = e.getKeyCode();
@@ -460,9 +517,11 @@ public class CMClientApp extends JFrame {
         public void actionPerformed(ActionEvent e) {
             JButton button = (JButton)e.getSource();
             if(button.getText().equals("Start CM Client")) startCM();
-            else if(button.getText().equals("Stop CM Cilent")) stopCM();
+            else if(button.getText().equals("Stop CM Client")) stopCM();
             else if(button.getText().equals("Login")) requestLogin();
             //else if(button.getText().equals("Logout")) requestLogout();
+            else if(button.getText().equals("Client Folder")) openClientFolder();
+            else if(button.getText().equals("Server Folder")) openServerFolder();
 
             m_inTextField.requestFocus();
         }
