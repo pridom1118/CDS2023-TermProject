@@ -4,6 +4,7 @@ import kr.ac.konkuk.ccslab.cm.event.handler.CMAppEventHandler;
 import kr.ac.konkuk.ccslab.cm.info.CMConfigurationInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMFileTransferInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMInfo;
+import kr.ac.konkuk.ccslab.cm.info.CMInteractionInfo;
 import kr.ac.konkuk.ccslab.cm.stub.CMClientStub;
 
 import java.io.File;
@@ -56,14 +57,25 @@ public class CMClientEventHandler implements CMAppEventHandler {
                     printMessage("This client fails authentication by the default server!\n");
                 else if (se.isValidUser() == -1)
                     printMessage("This client is already in the login-user list!\n");
-                else
+                else {
                     printMessage("This client successfully logs in to the default server.\n");
+                    CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
+                    m_client.setTitle("CM Client [" + interInfo.getMyself().getName() + "]");
+                    m_client.setButtonsAccordingToClientState();
+                }
+                break;
+            case CMSessionEvent.JOIN_SESSION:
+                m_client.setButtonsAccordingToClientState();
                 break;
             case CMSessionEvent.UNEXPECTED_SERVER_DISCONNECTION:
-                printMessage("Unexpected disconnection from [" + se.getChannelName() + "].\n");
+                m_client.printStyledMessage("Unexpected disconnection from [" + se.getChannelName() + "].\n", "bold");
+                m_client.setButtonsAccordingToClientState();
+                m_client.setTitle("CM Client");
                 break;
             case CMSessionEvent.INTENTIONALLY_DISCONNECT:
                 printMessage("Intentionally disconnected from the channel.\n");
+                m_client.setButtonsAccordingToClientState();
+                m_client.setTitle("CM Client");
                 break;
             default:
                 return;
@@ -104,13 +116,11 @@ public class CMClientEventHandler implements CMAppEventHandler {
             case CMFileEvent.REPLY_PERMIT_PUSH_FILE:
                 break;
             case CMFileEvent.START_FILE_TRANSFER:
-            case CMFileEvent.START_FILE_TRANSFER_CHAN:
                 if(fInfo.getStartRequestTime() != 0) {
                     printMessage("[" + fe.getFileReceiver() + "] starts to receive " + fe.getFileName() + ").\n");
                 }
                 break;
             case CMFileEvent.END_FILE_TRANSFER:
-            case CMFileEvent.END_FILE_TRANSFER_CHAN:
                 if(fInfo.getStartRequestTime() != 0) {
                     printMessage("[" + fe.getFileReceiver() + "] completes to send " + fe.getFileName() + ").\n");
                     printMessage(" file size: " + fe.getFileSize() + "bytes.\n");
@@ -121,7 +131,6 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 }
                 break;
             case CMFileEvent.END_FILE_TRANSFER_ACK:
-            case CMFileEvent.END_FILE_TRANSFER_CHAN_ACK:
                 if(fInfo.getStartRequestTime() != 0) {
                     printMessage("[" + fe.getFileReceiver() + "] completes to send " + fe.getFileName() + ").\n");
                     printMessage(" file size: " + fe.getFileSize() + "bytes.\n");

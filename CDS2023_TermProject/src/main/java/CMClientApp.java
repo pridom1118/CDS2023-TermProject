@@ -19,8 +19,15 @@ public class CMClientApp extends JFrame {
     private CMClientEventHandler m_eventHandler;
     private MyMouseListener cmMouseListener;
 
+    private JButton m_startStopButton;
+    private JButton m_loginLogoutButton;
+    private JButton m_clientFolderButton;
+    private JButton m_serverFolderButton;
+
     public CMClientApp() {
         MyKeyListener cmKeyListener = new MyKeyListener();
+        MyActionListener cmActionListener = new MyActionListener();
+
         setTitle("CM Client");
         setSize(600, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -39,6 +46,21 @@ public class CMClientApp extends JFrame {
         m_inTextField = new JTextField();
         m_inTextField.addKeyListener(cmKeyListener);
         add(m_inTextField, BorderLayout.SOUTH);
+
+        JPanel topButtonPanel = new JPanel();
+        topButtonPanel.setBackground(new Color(220, 220, 220));
+        topButtonPanel.setLayout(new FlowLayout());
+        add(topButtonPanel, BorderLayout.NORTH);
+
+        m_startStopButton = new JButton("Start CM Client");
+        m_startStopButton.addActionListener(cmActionListener);
+        m_startStopButton.setEnabled(false);
+        topButtonPanel.add(m_startStopButton);
+
+        m_loginLogoutButton = new JButton("Login");
+        m_loginLogoutButton.addActionListener(cmActionListener);
+        m_loginLogoutButton.setEnabled(false);
+        topButtonPanel.add(m_loginLogoutButton);
 
         setVisible(true);
         m_clientStub = new CMClientStub();
@@ -76,8 +98,11 @@ public class CMClientApp extends JFrame {
         if(!ret) {
             printStyledMessage("CM initialization error!\n", "bold");
         } else {
+            m_startStopButton.setEnabled(true);
+            m_loginLogoutButton.setEnabled(true);
             printStyledMessage("Client CM starts.\n", "bold");
             printStyledMessage("Type \"0\" for menu.\n", "regular");
+            setButtonsAccordingToClientState();
         }
     }
 
@@ -131,6 +156,29 @@ public class CMClientApp extends JFrame {
         m_outTextPane.insertComponent(pathLabel);
         printMessage("\n");
     }
+
+    public void setButtonsAccordingToClientState() {
+        int nClientState = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getState();
+
+        switch(nClientState) {
+            case CMInfo.CM_INIT:
+            case CMInfo.CM_CONNECT:
+                m_startStopButton.setText("Stop CM Client");
+                m_loginLogoutButton.setText("Login");
+                break;
+            case CMInfo.CM_LOGIN:
+            case CMInfo.CM_SESSION_JOIN:
+                m_startStopButton.setText("Stop CM Client");
+                m_loginLogoutButton.setText("Logout");
+            default:
+                m_startStopButton.setText("Start CM Client");
+                m_loginLogoutButton.setText("Login");
+                break;
+        }
+        revalidate();
+        repaint();
+    }
+
     private void printAllMenu() {
         printMessage("---------- Menu ----------\n");
         printMessage("0. Print Menu\n");
@@ -390,6 +438,18 @@ public class CMClientApp extends JFrame {
 
         @Override
         public void mouseReleased(MouseEvent e) { }
+    }
+
+    public class MyActionListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            JButton button = (JButton)e.getSource();
+            if(button.getText().equals("Start CM Client")) startCM();
+            //else if(button.getText().equals("Stop CM Cilent")) stopCM();
+            else if(button.getText().equals("Login")) requestLogin();
+            //else if(button.getText().equals("Logout")) requestLogout();
+
+            m_inTextField.requestFocus();
+        }
     }
 
     public static void main(String[] args) {

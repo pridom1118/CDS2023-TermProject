@@ -78,26 +78,6 @@ public class CMServerApp {
         System.out.println("Set file path to " + strPath);
     }
 
-    public void requestFile() {
-
-    }
-
-    public void pushFile() {
-
-    }
-
-    public void cancelRecvFile() {
-
-    }
-
-    public void cancelSendFile() {
-
-    }
-
-    public void printSendRecvFileInfo() {
-
-    }
-
     public void processInput(String strInput) {
         int nCommand = -1;
         try {
