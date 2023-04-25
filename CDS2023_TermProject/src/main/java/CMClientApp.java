@@ -435,14 +435,14 @@ public class CMClientApp extends JFrame {
         Set<String> sendKeySet = sendHashtable.keySet();
         Set<String> recvKeySet = recvHashtable.keySet();
 
-        printMessage("==== sending file info\n");
+        printMessage("====== sending file info ======\n");
         for(String receiver : sendKeySet)
         {
             CMList<CMSendFileInfo> sendList = sendHashtable.get(receiver);
             printMessage(sendList+"\n");
         }
 
-        printMessage("==== receiving file info\n");
+        printMessage("====== receiving file info ======\n");
         for(String sender : recvKeySet)
         {
             CMList<CMRecvFileInfo> recvList = recvHashtable.get(sender);
