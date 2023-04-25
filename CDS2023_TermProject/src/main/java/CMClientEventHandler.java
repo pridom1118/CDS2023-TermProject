@@ -117,7 +117,12 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 break;
             case CMFileEvent.START_FILE_TRANSFER:
                 if(fInfo.getStartRequestTime() != 0) {
-                    printMessage("[" + fe.getFileReceiver() + "] starts to receive file:  " + fe.getFileName() + ".\n");
+                    printMessage("[" + fe.getFileSender() + "] starts to send file:  " + fe.getFileName() + ".\n");
+                }
+                break;
+            case CMFileEvent.START_FILE_TRANSFER_ACK:
+                if(fInfo.getStartRequestTime() != 0) {
+                    printMessage("["+fe.getFileReceiver()+"] starts to receive file: " + fe.getFileName() +".\n");
                 }
                 break;
             case CMFileEvent.END_FILE_TRANSFER:
