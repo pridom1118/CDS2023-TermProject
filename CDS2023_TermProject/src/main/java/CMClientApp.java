@@ -75,10 +75,12 @@ public class CMClientApp extends JFrame {
         m_clientFolderButton = new JButton("Client Folder");
         m_clientFolderButton.addActionListener(cmActionListener);
         m_clientFolderButton.setEnabled(false);
+        topButtonPanel.add(m_clientFolderButton);
 
         m_serverFolderButton = new JButton("Server Folder");
         m_serverFolderButton.addActionListener(cmActionListener);
         m_serverFolderButton.setEnabled(false);
+        topButtonPanel.add(m_serverFolderButton);
 
         setVisible(true);
         m_clientStub = new CMClientStub();
@@ -221,12 +223,11 @@ public class CMClientApp extends JFrame {
         printMessage("0. Print Menu\n");
         printMessage("1. Login\n");
         printMessage("2. Show currently logged in users\n");
-        printMessage("999. Exit Client\n");
         printMessage("\n---------- File ----------\n");
         printMessage("3. Upload / Send the file\n");
         printMessage("4. Download / Request the file\n");
         printMessage("5. Print currently sending / receiving file\n");
-        printMessage("clear. Literally clears the display.\n");
+        printMessage("\nclear. Literally clears the display.\n");
     }
 
     private void processInput(String strInput) {
@@ -287,7 +288,16 @@ public class CMClientApp extends JFrame {
             if(ret) System.out.println("successfully sent the login request.\n");
             else System.out.println("failed to send the login request.\n");
         }
+    }
 
+    private void requestLogout() {
+        printMessage("Requesting logout.\n");
+        boolean ret = m_clientStub.logoutCM();
+        if(ret) printMessage("successfully sent the logout request\n");
+        else printMessage("logout request failed.\n");
+
+        setButtonsAccordingToClientState();
+        setTitle("CM Client");
     }
 
     private void requestAttachedFile(String strFileName) {
@@ -519,7 +529,7 @@ public class CMClientApp extends JFrame {
             if(button.getText().equals("Start CM Client")) startCM();
             else if(button.getText().equals("Stop CM Client")) stopCM();
             else if(button.getText().equals("Login")) requestLogin();
-            //else if(button.getText().equals("Logout")) requestLogout();
+            else if(button.getText().equals("Logout")) requestLogout();
             else if(button.getText().equals("Client Folder")) openClientFolder();
             else if(button.getText().equals("Server Folder")) openServerFolder();
 

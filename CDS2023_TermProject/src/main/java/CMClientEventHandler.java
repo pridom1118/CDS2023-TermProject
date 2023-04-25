@@ -117,12 +117,12 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 break;
             case CMFileEvent.START_FILE_TRANSFER:
                 if(fInfo.getStartRequestTime() != 0) {
-                    printMessage("[" + fe.getFileReceiver() + "] starts to receive " + fe.getFileName() + ").\n");
+                    printMessage("[" + fe.getFileReceiver() + "] starts to receive file:  " + fe.getFileName() + ".\n");
                 }
                 break;
             case CMFileEvent.END_FILE_TRANSFER:
                 if(fInfo.getStartRequestTime() != 0) {
-                    printMessage("[" + fe.getFileReceiver() + "] completes to send " + fe.getFileName() + ").\n");
+                    printMessage("[" + fe.getFileSender() + "] completes to send file: " + fe.getFileName() + ".\n");
                     printMessage(" file size: " + fe.getFileSize() + "bytes.\n");
                     lTotalDelay = fInfo.getEndRecvTime() - fInfo.getStartRequestTime();
                     printMessage("total delay: " + lTotalDelay + "ms, ");
@@ -132,12 +132,12 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 break;
             case CMFileEvent.END_FILE_TRANSFER_ACK:
                 if(fInfo.getStartRequestTime() != 0) {
-                    printMessage("[" + fe.getFileReceiver() + "] completes to send " + fe.getFileName() + ").\n");
+                    printMessage("[" + fe.getFileReceiver() + "] completes to receive file: " + fe.getFileName() + ".\n");
                     printMessage(" file size: " + fe.getFileSize() + "bytes.\n");
-                    lTotalDelay = fInfo.getEndSendTime() - fInfo.getStartSendTime();
+                    lTotalDelay = fInfo.getEndSendTime() - fInfo.getStartRequestTime();
                     printMessage("total delay: " + lTotalDelay + "ms, ");
                     lTransferDelay = fInfo.getEndSendTime() - fInfo.getStartSendTime();
-                    printMessage(" file receiving delay: " + lTransferDelay + " ms.\n");
+                    printMessage(" file sending delay: " + lTransferDelay + " ms.\n");
                 }
         }
     }
