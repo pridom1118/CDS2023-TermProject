@@ -107,6 +107,7 @@ public class CMServerApp {
         Scanner scan = new Scanner(System.in);
         String cmd = "hi";
 
+        System.out.println("Press 0 to see the menu.");
         while(true) {
             cmd = scan.nextLine();
             if(cmd.equals("exit")) {
