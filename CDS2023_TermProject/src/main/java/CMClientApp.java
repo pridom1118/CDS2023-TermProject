@@ -321,7 +321,7 @@ public class CMClientApp extends JFrame {
         byte byteFileAppendMode = -1;
         CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
 
-        printMessage("----- File Request -----\n");
+        printMessage("---------- File Request ----------\n");
 
         JTextField fnameField = new JTextField();
         JTextField fownerField = new JTextField();
@@ -364,7 +364,7 @@ public class CMClientApp extends JFrame {
 
         ret = m_clientStub.requestFile(strFileName, strFileOwner, byteFileAppendMode);
         if(!ret) printMessage("An error occurred for the file request: [" + strFileOwner + "] - " + strFileName + "\n");
-        printMessage("------------------------");
+        printMessage("----------------------------------");
     }
     private void pushFile() {
         String strFilePath = null;
@@ -374,7 +374,7 @@ public class CMClientApp extends JFrame {
         CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
         boolean ret = false;
 
-        printMessage("----- File Upload -----\n");
+        printMessage("---------- File Upload ----------\n\n");
 
         JTextField freceiverField = new JTextField();
         String[] fAppendMode = {"Default", "Overwrite", "Append"};
@@ -408,13 +408,16 @@ public class CMClientApp extends JFrame {
 
         JFileChooser fc = new JFileChooser();
         fc.setMultiSelectionEnabled(true);
+
         CMConfigurationInfo confInfo = m_clientStub.getCMInfo().getConfigurationInfo();
         File curDir = new File(confInfo.getTransferedFileHome().toString());
         fc.setCurrentDirectory(curDir);
         int fcRet = fc.showOpenDialog(this);
         if(fcRet != JFileChooser.APPROVE_OPTION) return;
+
         files = fc.getSelectedFiles();
         if(files.length < 1) return;
+
         for(int i=0; i < files.length; i++) {
             strFilePath = files[i].getPath();
             ret = m_clientStub.pushFile(strFilePath, strReceiver, byteFileAppendMode);
@@ -422,7 +425,7 @@ public class CMClientApp extends JFrame {
                 printMessage("push file error! file("+strFilePath+"), receiver(" +strReceiver+")\n");
             }
         }
-        printMessage("------------------------");
+        printMessage("----------------------------------");
     }
 
     public void printCurrentFileInfo() {

@@ -91,9 +91,6 @@ public class CMServerApp {
             case 0:
                 printAllMenu();
                 break;
-            case 999:
-                m_serverStub.terminateCM();
-                break;
             case 1:
                 printLoginUsers();
                 break;
@@ -106,6 +103,18 @@ public class CMServerApp {
         CMServerStub cmStub = server.getServerStub();
         cmStub.setAppEventHandler(server.getServerEventHandler());
         cmStub.startCM();
+
+        Scanner scan = new Scanner(System.in);
+        String cmd = "hi";
+
+        while(true) {
+            cmd = scan.nextLine();
+            if(cmd.equals("exit")) {
+                cmStub.terminateCM();
+                System.out.println("CM Server terminates.");
+                break;
+            } else server.processInput(cmd);
+        }
     }
 }
 
