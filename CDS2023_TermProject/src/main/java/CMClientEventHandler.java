@@ -90,7 +90,7 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 printMessage("["+de.getUserName()+"] just logged in.\n");
                 break;
             case CMDataEvent.REMOVE_USER:
-                printMessage("["+de.getUserName()+"] just logged off.");
+                printMessage("["+de.getUserName()+"] just logged off.\n");
                 break;
             default:
                 return;

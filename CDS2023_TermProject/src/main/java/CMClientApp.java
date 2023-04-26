@@ -210,7 +210,7 @@ public class CMClientApp extends JFrame {
     }
 
     private void initializeButtons() {
-        m_startStopButton.setText("Start Client CM");
+        m_startStopButton.setText("Start CM Client");
         m_loginLogoutButton.setText("Login");
         m_clientFolderButton.setEnabled(false);
         m_serverFolderButton.setEnabled(false);
