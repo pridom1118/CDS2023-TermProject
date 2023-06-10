@@ -14,25 +14,44 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchEvent.Kind;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
+import java.util.ArrayList;
 
 public class CMClientApp extends JFrame {
     private JTextPane m_outTextPane;
+    private JTextPane m_fileTextPane;
     private JTextField m_inTextField;
+    private JTextField m_fileTextField;
     private CMClientStub m_clientStub;
     private CMClientEventHandler m_eventHandler;
     private MyMouseListener cmMouseListener;
 
     private JButton m_startStopButton;
     private JButton m_loginLogoutButton;
-    private JButton m_clientFolderButton;
-    private JButton m_serverFolderButton;
+    private JButton m_fileUploadButton;
+    private JButton m_fileShareButton;
+    private JButton m_refreshButton;
 
-    private JFrame m_clientWindow;
-    private JFrame m_serverWindow;
+    // For displaying the file list using JTable
+    private JScrollPane m_fileScrollPane;
+    private JTable m_fileTable;
+    //The header and contents of the table
+    private String[] header;
+    private ArrayList<String[]> contents;
+
+    //WatchService: Automatically detects creation / deletion / update of the file
+    private WatchKey watchkey;
+    private static String user_path;
 
     public CMClientApp() {
         MyKeyListener cmKeyListener = new MyKeyListener();
@@ -43,19 +62,29 @@ public class CMClientApp extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
+        //Table init
+        header = new String[] {"Name", "Size", "Lclock"};
+        contents = new ArrayList<String[]>();
+
         m_outTextPane = new JTextPane();
         m_outTextPane.setBackground(new Color(245, 245, 245));
         m_outTextPane.setEditable(false);
 
         StyledDocument doc = m_outTextPane.getStyledDocument();
         addStylesToDocument(doc);
-        add(m_outTextPane, BorderLayout.CENTER);
+        add(m_outTextPane, BorderLayout.SOUTH);
         JScrollPane centerScroll = new JScrollPane (m_outTextPane, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        getContentPane().add(centerScroll, BorderLayout.CENTER);
+        getContentPane().add(centerScroll, BorderLayout.SOUTH);
 
-        m_inTextField = new JTextField();
-        m_inTextField.addKeyListener(cmKeyListener);
-        add(m_inTextField, BorderLayout.SOUTH);
+        m_fileTextPane = new JTextPane();
+        m_fileTextPane.setBackground(new Color(245, 245, 245));
+        m_fileTextPane.setEditable(false);
+
+        StyledDocument fdoc = m_fileTextPane.getStyledDocument();
+        addStylesToDocument(fdoc);
+        add(m_fileTextPane, BorderLayout.CENTER);
+        JScrollPane fScroll = new JScrollPane (m_fileTextPane, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        getContentPane().add(fScroll, BorderLayout.CENTER);
 
         JPanel topButtonPanel = new JPanel();
         topButtonPanel.setBackground(new Color(220, 220, 220));
@@ -72,20 +101,29 @@ public class CMClientApp extends JFrame {
         m_loginLogoutButton.setEnabled(false);
         topButtonPanel.add(m_loginLogoutButton);
 
-        m_clientFolderButton = new JButton("Client Folder");
-        m_clientFolderButton.addActionListener(cmActionListener);
-        m_clientFolderButton.setEnabled(false);
-        topButtonPanel.add(m_clientFolderButton);
+        m_fileUploadButton = new JButton("File Upload");
+        m_fileUploadButton.addActionListener(cmActionListener);
+        m_fileUploadButton.setEnabled(false);
+        topButtonPanel.add(m_fileUploadButton);
 
-        m_serverFolderButton = new JButton("Server Folder");
-        m_serverFolderButton.addActionListener(cmActionListener);
-        m_serverFolderButton.setEnabled(false);
-        topButtonPanel.add(m_serverFolderButton);
+        m_fileShareButton = new JButton("File Share");
+        m_fileShareButton.addActionListener(cmActionListener);
+        m_fileShareButton.setEnabled(false);
+        topButtonPanel.add(m_fileShareButton);
+
+        JPanel botButtonPanel = new JPanel();
+        botButtonPanel.setBackground(new Color(220, 220, 220));
+        botButtonPanel.setLayout(new FlowLayout());
+        add(botButtonPanel, BorderLayout.SOUTH);
+
+        m_refreshButton = new JButton("Refresh");
+        m_refreshButton.addActionListener(cmActionListener);
+        m_refreshButton.setEnabled(false);
+        botButtonPanel.add(m_refreshButton);
 
         setVisible(true);
         m_clientStub = new CMClientStub();
         m_eventHandler = new CMClientEventHandler(m_clientStub, this);
-        m_inTextField.requestFocus();
         startCM();
     }
 
@@ -120,10 +158,9 @@ public class CMClientApp extends JFrame {
         } else {
             m_startStopButton.setEnabled(true);
             m_loginLogoutButton.setEnabled(true);
-            m_clientFolderButton.setEnabled(true);
-            m_serverFolderButton.setEnabled(true);
+            m_fileUploadButton.setEnabled(true);
+            m_fileShareButton.setEnabled(true);
             printStyledMessage("Client CM starts.\n", "bold");
-            printStyledMessage("Type \"0\" for menu.\n", "regular");
             setButtonsAccordingToClientState();
         }
     }
@@ -158,6 +195,8 @@ public class CMClientApp extends JFrame {
             e.printStackTrace();
         }
     }
+
+
     public void printMessage(String strText) {
         StyledDocument doc = m_outTextPane.getStyledDocument();
         try {
@@ -177,6 +216,26 @@ public class CMClientApp extends JFrame {
             e.printStackTrace();
         }
         return;
+    }
+
+    public void printFileMessage(String strText) {
+        StyledDocument doc = m_fileTextPane.getStyledDocument();
+        try {
+            doc.insertString(doc.getLength(), strText, null);
+            m_fileTextPane.setCaretPosition(m_fileTextPane.getDocument().getLength());
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void clearFileMessage() {
+        StyledDocument doc = m_fileTextPane.getStyledDocument();
+        try {
+            doc.remove(0, doc.getLength());
+            m_fileTextPane.setCaretPosition(m_fileTextPane.getDocument().getLength());
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
     }
 
     public void printFilePath(String strPath) {
@@ -199,6 +258,7 @@ public class CMClientApp extends JFrame {
             case CMInfo.CM_SESSION_JOIN:
                 m_startStopButton.setText("Stop CM Client");
                 m_loginLogoutButton.setText("Logout");
+                m_refreshButton.setEnabled(true);
                 break;
             default:
                 m_startStopButton.setText("Start CM Client");
@@ -212,8 +272,8 @@ public class CMClientApp extends JFrame {
     private void initializeButtons() {
         m_startStopButton.setText("Start CM Client");
         m_loginLogoutButton.setText("Login");
-        m_clientFolderButton.setEnabled(false);
-        m_serverFolderButton.setEnabled(false);
+        m_fileUploadButton.setEnabled(false);
+        m_fileShareButton.setEnabled(false);
         revalidate();
         repaint();
     }
@@ -287,6 +347,8 @@ public class CMClientApp extends JFrame {
             ret = m_clientStub.loginCM(username, "");
             if(ret) System.out.println("successfully sent the login request.\n");
             else System.out.println("failed to send the login request.\n");
+            getFileDir();
+            user_path = "..\\CDS2023_TermProject\\client-file-path\\" + username;
         }
     }
 
@@ -428,6 +490,10 @@ public class CMClientApp extends JFrame {
         printMessage("----------------------------------");
     }
 
+    private void shareFile() {
+
+    }
+
     public void printCurrentFileInfo() {
         CMFileTransferInfo fInfo = m_clientStub.getCMInfo().getFileTransferInfo();
         Hashtable<String, CMList<CMSendFileInfo>> sendHashtable = fInfo.getSendFileHashtable();
@@ -450,17 +516,19 @@ public class CMClientApp extends JFrame {
         }
     }
 
-    private void openClientFolder() {
-        m_clientWindow = new JFrame();
-        m_clientWindow.setSize(600, 600);
-        m_clientWindow.setDefaultCloseOperation(EXIT_ON_CLOSE);
-        m_clientWindow.setTitle("Client Window [" + m_clientStub.getMyself().getName() + "]");
+    //Only called when logged-in
+    public void getFileDir() {
+        clearFileMessage();
+        String username = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
+        File dir = new File(user_path);
+        //File files[] = dir.listFiles();
+        String filenames[] = dir.list();
 
-        JPanel panel = new JPanel();
-    }
-
-    private void openServerFolder() {
-
+        if(filenames != null) {
+            for(int i = 0; i < filenames.length; i++) {
+                printFileMessage(filenames[i] + "\n");
+            }
+        } else printFileMessage("Folder empty.");
     }
 
     public class MyKeyListener implements KeyListener {
@@ -533,10 +601,9 @@ public class CMClientApp extends JFrame {
             else if(button.getText().equals("Stop CM Client")) stopCM();
             else if(button.getText().equals("Login")) requestLogin();
             else if(button.getText().equals("Logout")) requestLogout();
-            else if(button.getText().equals("Client Folder")) openClientFolder();
-            else if(button.getText().equals("Server Folder")) openServerFolder();
-
-            m_inTextField.requestFocus();
+            else if(button.getText().equals("File Upload")) pushFile();
+            else if(button.getText().equals("File Share")) shareFile();
+            else if(button.getText().equals("Refresh")) getFileDir();
         }
     }
 
