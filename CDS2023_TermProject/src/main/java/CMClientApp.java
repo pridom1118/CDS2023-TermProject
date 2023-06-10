@@ -74,7 +74,7 @@ public class CMClientApp extends JFrame {
         addStylesToDocument(doc);
         add(m_outTextPane, BorderLayout.SOUTH);
         JScrollPane centerScroll = new JScrollPane (m_outTextPane, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        getContentPane().add(centerScroll, BorderLayout.SOUTH);
+        getContentPane().add(centerScroll, BorderLayout.EAST);
 
         m_fileTextPane = new JTextPane();
         m_fileTextPane.setBackground(new Color(245, 245, 245));
@@ -160,7 +160,7 @@ public class CMClientApp extends JFrame {
             m_loginLogoutButton.setEnabled(true);
             m_fileUploadButton.setEnabled(true);
             m_fileShareButton.setEnabled(true);
-            printStyledMessage("Client CM starts.\n", "bold");
+            printStyledMessage("Client CM starts.\n Welcome!\n" , "bold");
             setButtonsAccordingToClientState();
         }
     }
@@ -348,7 +348,14 @@ public class CMClientApp extends JFrame {
             if(ret) System.out.println("successfully sent the login request.\n");
             else System.out.println("failed to send the login request.\n");
             getFileDir();
-            user_path = "..\\CDS2023_TermProject\\client-file-path\\" + username;
+            user_path = System.getProperty("user.dir");
+            user_path += "\\client-file-path\\" + username;
+
+            try {
+                startWatchService();
+            } catch(IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -520,7 +527,7 @@ public class CMClientApp extends JFrame {
     public void getFileDir() {
         clearFileMessage();
         String username = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
-        File dir = new File(user_path);
+        File dir = new File("..\\CDS2023_TermProject\\client-file-path\\" + username);
         //File files[] = dir.listFiles();
         String filenames[] = dir.list();
 
@@ -529,6 +536,64 @@ public class CMClientApp extends JFrame {
                 printFileMessage(filenames[i] + "\n");
             }
         } else printFileMessage("Folder empty.");
+    }
+
+    public void startWatchService() throws IOException {
+        int nClientState = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getState();
+
+        if(nClientState != CMInfo.CM_LOGIN && nClientState != CMInfo.CM_SESSION_JOIN) {
+            printMessage("WatchService currently unavailable: Client is not logged in!\n");
+            return;
+        }
+
+        WatchService watchService = FileSystems.getDefault().newWatchService();
+        Path path = Paths.get(user_path);
+        path.register(watchService,
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_MODIFY,
+                StandardWatchEventKinds.ENTRY_DELETE,
+                StandardWatchEventKinds.OVERFLOW);
+
+        Thread thread = new Thread(() -> {
+            while(true) {
+                int currentState = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getState();
+                if(currentState != CMInfo.CM_LOGIN && currentState != CMInfo.CM_SESSION_JOIN) break;
+
+                try {
+                    watchkey = watchService.take(); // wait for an event
+                } catch(InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                List<WatchEvent<?>> events = watchkey.pollEvents(); // get events
+                for(WatchEvent<?> event: events) {
+                    Kind<?> kind = event.kind();
+                    Path paths = (Path)event.context();
+
+                    if(kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) {
+                        printMessage("Created a file " + paths.getFileName() + " in the directory\n");
+                        getFileDir();
+                    } else if(kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
+                        printMessage("Modified the file " + paths.getFileName() + " in the directory\n");
+                        getFileDir();
+                    } else if(kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
+                        printMessage("Deleted the file " + paths.getFileName() + " in the directory\n");
+                        getFileDir();
+                    } else {
+                        printMessage("Something wrong in WatchService.\n");
+                    }
+                }
+
+                if(!watchkey.reset()) {
+                    try {
+                        watchService.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+        thread.start();
     }
 
     public class MyKeyListener implements KeyListener {
@@ -608,6 +673,7 @@ public class CMClientApp extends JFrame {
     }
 
     public static void main(String[] args) {
+
         CMClientApp client = new CMClientApp();
         CMClientStub clientStub = client.getClientStub();
         clientStub.setAppEventHandler(client.getClientEventHandler());
