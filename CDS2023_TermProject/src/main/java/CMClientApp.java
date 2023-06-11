@@ -9,6 +9,7 @@ import kr.ac.konkuk.ccslab.cm.manager.CMCommManager;
 import kr.ac.konkuk.ccslab.cm.stub.CMClientStub;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -24,9 +25,7 @@ import java.util.Hashtable;
 
 public class CMClientApp extends JFrame {
     private JTextPane m_outTextPane;
-    private JTextPane m_fileTextPane;
     private JTextField m_inTextField;
-    private JTextField m_fileTextField;
     private CMClientStub m_clientStub;
     private CMClientEventHandler m_eventHandler;
     private MyMouseListener cmMouseListener;
@@ -42,7 +41,7 @@ public class CMClientApp extends JFrame {
     private JTable m_fileTable;
     //The header and contents of the table
     private String[] header;
-    private ArrayList<String[]> contents;
+    private DefaultTableModel filetModel;
 
     //WatchService: Automatically detects creation / deletion / update of the file
     private WatchKey watchkey;
@@ -62,7 +61,11 @@ public class CMClientApp extends JFrame {
 
         //Table init
         header = new String[] {"Name", "Size", "Logical Clock", "Shared Users"};
-        contents = new ArrayList<String[]>();
+        filetModel = new DefaultTableModel(header, 0);
+        m_fileTable = new JTable(filetModel);
+        m_fileScrollPane = new JScrollPane(m_fileTable);
+        m_fileScrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        add(m_fileScrollPane, BorderLayout.CENTER);
         HT = new Hashtable<String, SyncFile>();
 
         m_outTextPane = new JTextPane();
@@ -74,16 +77,6 @@ public class CMClientApp extends JFrame {
         add(m_outTextPane, BorderLayout.SOUTH);
         JScrollPane centerScroll = new JScrollPane (m_outTextPane, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         getContentPane().add(centerScroll, BorderLayout.EAST);
-
-        m_fileTextPane = new JTextPane();
-        m_fileTextPane.setBackground(new Color(245, 245, 245));
-        m_fileTextPane.setEditable(false);
-
-        StyledDocument fdoc = m_fileTextPane.getStyledDocument();
-        addStylesToDocument(fdoc);
-        add(m_fileTextPane, BorderLayout.CENTER);
-        JScrollPane fScroll = new JScrollPane (m_fileTextPane, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        getContentPane().add(fScroll, BorderLayout.CENTER);
 
         JPanel topButtonPanel = new JPanel();
         topButtonPanel.setBackground(new Color(220, 220, 220));
@@ -217,26 +210,6 @@ public class CMClientApp extends JFrame {
         return;
     }
 
-    public void printFileMessage(String strText) {
-        StyledDocument doc = m_fileTextPane.getStyledDocument();
-        try {
-            doc.insertString(doc.getLength(), strText, null);
-            m_fileTextPane.setCaretPosition(m_fileTextPane.getDocument().getLength());
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void clearFileMessage() {
-        StyledDocument doc = m_fileTextPane.getStyledDocument();
-        try {
-            doc.remove(0, doc.getLength());
-            m_fileTextPane.setCaretPosition(m_fileTextPane.getDocument().getLength());
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
-    }
-
     public void printFilePath(String strPath) {
         JLabel pathLabel = new JLabel(strPath);
         pathLabel.addMouseListener(cmMouseListener);
@@ -359,12 +332,6 @@ public class CMClientApp extends JFrame {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-            }
-
-            try {
-                startWatchService();
-            } catch(IOException e) {
-                e.printStackTrace();
             }
         }
     }
@@ -511,6 +478,29 @@ public class CMClientApp extends JFrame {
 
     }
 
+    // adds a row to the file table
+    private void addFileRow(String[] fileValue) {
+        DefaultTableModel model = (DefaultTableModel) m_fileTable.getModel();
+        model.addRow(fileValue);
+    }
+
+    private void removeFileRow(int idx) {
+        DefaultTableModel model = (DefaultTableModel) m_fileTable.getModel();
+        int cnt = model.getRowCount();
+
+        if(idx < cnt) model.removeRow(idx);
+    }
+
+    private void removeFileRowAll() {
+        DefaultTableModel model = (DefaultTableModel) m_fileTable.getModel();
+        int cnt = model.getRowCount();
+
+        while(cnt > 0) {
+            model.removeRow(cnt - 1);
+            cnt--;
+        }
+    }
+
     public void printCurrentFileInfo() {
         CMFileTransferInfo fInfo = m_clientStub.getCMInfo().getFileTransferInfo();
         Hashtable<String, CMList<CMSendFileInfo>> sendHashtable = fInfo.getSendFileHashtable();
@@ -533,19 +523,40 @@ public class CMClientApp extends JFrame {
         }
     }
 
-    //Only called when logged-in
+    //refreshes the table with updated rows
     public void getFileDir() {
-        clearFileMessage();
+        // TODO: refresh the table with updated files
         String username = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
         File dir = new File("..\\CDS2023_TermProject\\client-file-path\\" + username);
+        removeFileRowAll();
         //File files[] = dir.listFiles();
         String filenames[] = dir.list();
 
         if(filenames != null) {
             for(int i = 0; i < filenames.length; i++) {
-                printFileMessage(filenames[i] + "\n");
+                SyncFile tmp = HT.get(filenames[i]);
+                if(tmp == null) continue;
+                addFileRow(tmp.getValue());
             }
-        } else printFileMessage("Folder empty.");
+        }
+    }
+
+    //Checks the file in the dir when logged-in.
+    public void initFileDir() {
+        // TODO: refresh the table with updated files
+        String username = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
+        File dir = new File("..\\CDS2023_TermProject\\client-file-path\\" + username);
+        File files[] = dir.listFiles();
+        //String filenames[] = dir.list();
+
+        if(files != null) {
+            for(int i = 0; i < files.length; i++) {
+                String name = files[i].getName();
+                String size = String.valueOf(files[i].length());
+                HT.put(name, new SyncFile(files[i].getName(), files[i].length()));
+                addFileRow(new String[]{name, size, "0", username });
+            }
+        }
     }
 
     public void startWatchService() throws IOException {
@@ -611,6 +622,7 @@ public class CMClientApp extends JFrame {
                         getFileDir();
                     } else if(kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
                         printMessage("Deleted the file " + paths.getFileName() + " in the directory\n");
+                        HT.remove(paths.getFileName().toString());
                         getFileDir();
                     } else {
                         printMessage("Something wrong in WatchService.\n");
@@ -737,6 +749,17 @@ public class CMClientApp extends JFrame {
 
         public void updateSize(long size) {
             fileSize = size;
+        }
+
+        public String[] getValue() {
+            String usrs = "";
+
+            for(String u: sharedUsers) {
+                usrs += u + "\n";
+            }
+
+            String[] ret = { fileName, String.valueOf(fileSize), String.valueOf(lclock), usrs };
+            return ret;
         }
     }
 

@@ -9,6 +9,7 @@ import kr.ac.konkuk.ccslab.cm.stub.CMClientStub;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class CMClientEventHandler implements CMAppEventHandler {
     private CMClientStub m_clientStub;
@@ -62,6 +63,13 @@ public class CMClientEventHandler implements CMAppEventHandler {
                     CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
                     m_client.setTitle("CM Client [" + interInfo.getMyself().getName() + "]");
                     m_client.setButtonsAccordingToClientState();
+
+                    try {
+                        m_client.initFileDir();
+                        m_client.startWatchService();
+                    } catch(IOException e) {
+                        e.printStackTrace();
+                    }
                 }
                 break;
             case CMSessionEvent.JOIN_SESSION:
