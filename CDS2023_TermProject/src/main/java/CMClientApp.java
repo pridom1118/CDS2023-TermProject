@@ -1,6 +1,9 @@
 import kr.ac.konkuk.ccslab.cm.entity.CMList;
 import kr.ac.konkuk.ccslab.cm.entity.CMRecvFileInfo;
 import kr.ac.konkuk.ccslab.cm.entity.CMSendFileInfo;
+import kr.ac.konkuk.ccslab.cm.entity.CMUser;
+import kr.ac.konkuk.ccslab.cm.event.CMDummyEvent;
+import kr.ac.konkuk.ccslab.cm.event.CMUserEvent;
 import kr.ac.konkuk.ccslab.cm.info.CMConfigurationInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMFileTransferInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMInfo;
@@ -45,7 +48,7 @@ public class CMClientApp extends JFrame {
 
     //WatchService: Automatically detects creation / deletion / update of the file
     private WatchKey watchkey;
-    private static String user_path;
+    public static String user_path;
 
     // For synchronization using logical clock and file sharing
     private Hashtable<String, SyncFile> HT;
@@ -187,7 +190,6 @@ public class CMClientApp extends JFrame {
             e.printStackTrace();
         }
     }
-
 
     public void printMessage(String strText) {
         StyledDocument doc = m_outTextPane.getStyledDocument();
@@ -501,6 +503,25 @@ public class CMClientApp extends JFrame {
         }
     }
 
+    private void sendFileSyncMessage(String mode, String[] fileInfo) {
+        CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
+        CMUser myself = interInfo.getMyself();
+        String username = myself.getName();
+        CMDummyEvent syncEvent = new CMDummyEvent();
+        syncEvent.setHandlerSession(myself.getCurrentSession());
+        syncEvent.setHandlerGroup(myself.getCurrentGroup());
+
+        /* processing the message
+        message format: mode / filename / size / lclock / users
+        attributes can be tokenized with the separator '/'
+        shared users can be tokenized with the separator '\n'
+         */
+        String msg = mode + "/" + fileInfo[0] + "/" + fileInfo[1] + "/" + fileInfo[2] + "/" + fileInfo[3];
+        syncEvent.setDummyInfo(msg);
+
+        m_clientStub.send(syncEvent, "SERVER");
+    }
+
     public void printCurrentFileInfo() {
         CMFileTransferInfo fInfo = m_clientStub.getCMInfo().getFileTransferInfo();
         Hashtable<String, CMList<CMSendFileInfo>> sendHashtable = fInfo.getSendFileHashtable();
@@ -525,7 +546,6 @@ public class CMClientApp extends JFrame {
 
     //refreshes the table with updated rows
     public void getFileDir() {
-        // TODO: refresh the table with updated files
         String username = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
         File dir = new File("..\\CDS2023_TermProject\\client-file-path\\" + username);
         removeFileRowAll();
@@ -587,16 +607,21 @@ public class CMClientApp extends JFrame {
                 }
 
                 List<WatchEvent<?>> events = watchkey.pollEvents(); // get events
+                CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
+                CMConfigurationInfo confInfo = m_clientStub.getCMInfo().getConfigurationInfo();
+                String strFilePath = null;
+                byte byteFileAppendMode = -1;
+
                 for(WatchEvent<?> event: events) {
                     Kind<?> kind = event.kind();
                     Path paths = (Path)event.context();
+                    String name = paths.getFileName().toString();
+                    long size = 0;
+                    strFilePath = user_path + "\\" + paths.getFileName();
 
                     if(kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) {
-                        String name = paths.getFileName().toString();
-                        long size = 0;
-
                         try {
-                            size = Files.size(Path.of(user_path + "\\" + paths.getFileName()));
+                            size = Files.size(Path.of(strFilePath));
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -604,24 +629,34 @@ public class CMClientApp extends JFrame {
                         SyncFile myFile = new SyncFile(name, size);
                         HT.put(name, myFile);
                         printMessage("Created a file " + name + " in the directory\n");
+                        byteFileAppendMode = CMInfo.FILE_DEFAULT;
+                        sendFileSyncMessage("create", myFile.getValue());
                         getFileDir();
+
+                        boolean ret = m_clientStub.pushFile(strFilePath, "SERVER", byteFileAppendMode);
+
+                        if(!ret) {
+                            printMessage("push file error! file("+name+"), receiver(server)\n");
+                        }
                     } else if(kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
                         printMessage("Modified the file " + paths.getFileName() + " in the directory\n");
-                        String name = paths.getFileName().toString();
-                        long size = 0;
 
                         try {
-                            size = Files.size(Path.of(user_path + "\\" + paths.getFileName()));
+                            size = Files.size(Path.of(strFilePath));
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-                        HT.get(name).updateSize(size);
-                        HT.get(name).updateFile();
+                        SyncFile tempFile = HT.get(name);
+                        tempFile.updateSize(size);
+                        tempFile.updateFile();
+                        HT.replace(name, tempFile);
 
                         printMessage("Updated " + name + ", with logical clock " + HT.get(name).lclock + "\n");
+                        sendFileSyncMessage("update", HT.get(name).getValue());
                         getFileDir();
                     } else if(kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
                         printMessage("Deleted the file " + paths.getFileName() + " in the directory\n");
+                        sendFileSyncMessage("delete", HT.get(name).getValue());
                         HT.remove(paths.getFileName().toString());
                         getFileDir();
                     } else {
@@ -639,6 +674,11 @@ public class CMClientApp extends JFrame {
             }
         });
         thread.start();
+    }
+
+    public void refreshUI() {
+        clearMessage();
+        getFileDir();
     }
 
     public class MyKeyListener implements KeyListener {
@@ -713,7 +753,7 @@ public class CMClientApp extends JFrame {
             else if(button.getText().equals("Logout")) requestLogout();
             else if(button.getText().equals("File Upload")) pushFile();
             else if(button.getText().equals("File Share")) shareFile();
-            else if(button.getText().equals("Refresh")) getFileDir();
+            else if(button.getText().equals("Refresh")) refreshUI();
         }
     }
 
@@ -757,6 +797,7 @@ public class CMClientApp extends JFrame {
             for(String u: sharedUsers) {
                 usrs += u + "\n";
             }
+            usrs = usrs.substring(0, usrs.length()-1);
 
             String[] ret = { fileName, String.valueOf(fileSize), String.valueOf(lclock), usrs };
             return ret;

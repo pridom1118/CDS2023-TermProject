@@ -45,6 +45,9 @@ public class CMClientEventHandler implements CMAppEventHandler {
             case CMInfo.CM_FILE_EVENT:
                 processFileEvent(cme);
                 break;
+            case CMInfo.CM_DUMMY_EVENT:
+                processDummyEvent(cme);
+                break;
             default:
                 return;
         }
@@ -109,6 +112,7 @@ public class CMClientEventHandler implements CMAppEventHandler {
         CMFileEvent fe = (CMFileEvent) cme;
         CMConfigurationInfo conInfo = null;
         CMFileTransferInfo fInfo = m_clientStub.getCMInfo().getFileTransferInfo();
+        String sender = cme.getSender();
 
         int nOption = -1;
         long lTotalDelay = 0;
@@ -116,6 +120,12 @@ public class CMClientEventHandler implements CMAppEventHandler {
 
         switch(fe.getID()) {
             case CMFileEvent.REQUEST_PERMIT_PULL_FILE:
+                if(sender == "SERVER") {
+                    printMessage("Synchronizing a file" + fe.getFileName() + " to server.\n");
+                    if(fe.getReturnCode() == -1) {
+                        printMessage(fe.getFileName() + " does not exist in the client\n");
+                    }
+                }
                 break;
             case CMFileEvent.REPLY_PERMIT_PULL_FILE:
                 break;
@@ -154,6 +164,12 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 }
         }
     }
+
+    private void processDummyEvent(CMEvent cme) {
+        CMDummyEvent due = (CMDummyEvent) cme;
+
+    }
+
     public void setReqAttachedFile(boolean bReq) {
         m_bReqAttachedFile = bReq;
     }

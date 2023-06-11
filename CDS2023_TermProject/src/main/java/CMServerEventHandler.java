@@ -1,18 +1,84 @@
-import kr.ac.konkuk.ccslab.cm.event.CMEvent;
-import kr.ac.konkuk.ccslab.cm.event.CMFileEvent;
-import kr.ac.konkuk.ccslab.cm.event.CMInterestEvent;
-import kr.ac.konkuk.ccslab.cm.event.CMSessionEvent;
+import kr.ac.konkuk.ccslab.cm.event.*;
 import kr.ac.konkuk.ccslab.cm.event.handler.CMAppEventHandler;
 import kr.ac.konkuk.ccslab.cm.info.CMFileTransferInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMInfo;
 import kr.ac.konkuk.ccslab.cm.stub.CMServerStub;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Hashtable;
+
 public class CMServerEventHandler implements CMAppEventHandler {
     private CMServerStub m_serverStub;
+    private Hashtable<String, FileInfo> fileHashTable;
+
+
+    public class FileInfo {
+        public String fileName;
+        public long fileSize;
+        public int lclock;
+        public ArrayList<String> sharedUsers;
+
+        public FileInfo(String name, long size, String username) {
+            fileName = name;
+            fileSize = size;
+            lclock = 0;
+            sharedUsers = new ArrayList<String>();
+            sharedUsers.add(username);
+        }
+
+        public FileInfo(String name, long size, String[] users) {
+            fileName = name;
+            fileSize = size;
+            lclock = 0;
+            sharedUsers = new ArrayList<String>();
+
+            for(String u: users) {
+                sharedUsers.add(u);
+            }
+        }
+
+        // should be called before synchronization
+        public void updateFile() {
+            lclock++;
+        }
+
+        public void shareFile(String usr) {
+            sharedUsers.add(usr);
+        }
+
+        public void updateSize(long size) {
+            fileSize = size;
+        }
+
+        public void setUsers(String[] users) {
+            sharedUsers.clear();
+            for(String u: users) {
+                sharedUsers.add(u);
+            }
+        }
+
+        public String[] getValue() {
+            String usrs = "";
+
+            for(String u: sharedUsers) {
+                usrs += u + "\n";
+            }
+            usrs = usrs.substring(0, usrs.length()-1);
+
+            String[] ret = { fileName, String.valueOf(fileSize), String.valueOf(lclock), usrs };
+            return ret;
+        }
+    }
+
 
     public CMServerEventHandler(CMServerStub serverStub) {
         m_serverStub = serverStub;
-
+        fileHashTable = new Hashtable<String, FileInfo>();
     }
 
     @Override
@@ -26,6 +92,9 @@ public class CMServerEventHandler implements CMAppEventHandler {
                 break;
             case CMInfo.CM_INTEREST_EVENT:
                 processInterestEvent(cme);
+                break;
+            case CMInfo.CM_DUMMY_EVENT:
+                processDummyEvent(cme);
                 break;
             default:
                 return;
@@ -116,4 +185,81 @@ public class CMServerEventHandler implements CMAppEventHandler {
                 return;
         }
     }
+
+    private void processDummyEvent(CMEvent cme) {
+        CMDummyEvent due = (CMDummyEvent) cme;
+
+        //Process the message
+        // [mode / filename / size / lclock / sharedUsers]
+        String[] msgPayload = due.getDummyInfo().split("/");
+        String[] sharedUsers = msgPayload[4].split("\n");
+        String sender = due.getSender();
+        long size = Long.parseLong(msgPayload[2]);
+        int lclock = Integer.parseInt(msgPayload[3]);
+        String strPath = System.getProperty("user.dir") + "\\server-file-path\\" + sender + "\\" + msgPayload[1];
+        FileInfo fileInfo = null;
+
+        System.out.println("\nGot sync message from the client: " + sender);
+
+        //at this point
+        switch(msgPayload[0]) {
+            case "create":
+                if(!fileHashTable.contains(msgPayload[1])) {
+                    System.out.println(sender + " just created the file " + msgPayload[1]);
+                    fileInfo = new FileInfo(msgPayload[1], size, sender);
+                    fileHashTable.put(msgPayload[1], fileInfo);
+                }
+                break;
+            case "update":
+                int serverLclock = 0;
+                if(fileHashTable.contains(msgPayload[1])) serverLclock = fileHashTable.get(msgPayload[1]).lclock;
+                System.out.println(sender + " just updated the file " + msgPayload[1]);
+
+                //logical clock
+                if(lclock > fileHashTable.get(msgPayload[1]).lclock) {
+                    fileHashTable.remove(msgPayload[1]);
+                    fileInfo = new FileInfo(msgPayload[1], size, sharedUsers);
+                    System.out.println(msgPayload[1] + " / " + msgPayload[2] + " bytes / " + msgPayload[3]);
+                    fileHashTable.put(msgPayload[1], fileInfo);
+
+                    Path filePath = Paths.get(strPath);
+
+                    try {
+                        Files.delete(filePath);
+                        System.out.println(sender + " just deleted the file " + msgPayload[1]);
+                        fileHashTable.remove(msgPayload[1]);
+                    } catch(NoSuchFileException e) {
+                        System.out.println("File " + msgPayload[1] + " does not exist.");
+                    } catch(IOException e) {
+                        e.printStackTrace();
+                    }
+
+                    m_serverStub.requestFile(sender + "\\" + msgPayload[1], sender, CMInfo.FILE_DEFAULT);
+
+                    for(String u: sharedUsers) {
+                        
+                    }
+                } else System.out.println(msgPayload[1] + " is outdated!");
+                break;
+            case "delete":
+                Path filePath = Paths.get(strPath);
+
+                try {
+                    Files.delete(filePath);
+                    System.out.println(sender + " just deleted the file " + msgPayload[1]);
+                    fileHashTable.remove(msgPayload[1]);
+                } catch(NoSuchFileException e) {
+                    System.out.println("File " + msgPayload[1] + " does not exist.");
+                } catch(IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            default:
+                System.err.println("Error while processing the sync message!");
+                break;
+        }
+        return;
+    }
+
+
 }
