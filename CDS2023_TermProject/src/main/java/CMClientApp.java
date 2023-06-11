@@ -14,18 +14,13 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
+import java.nio.file.*;
 import java.nio.file.WatchEvent.Kind;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Hashtable;
 
 public class CMClientApp extends JFrame {
     private JTextPane m_outTextPane;
@@ -53,6 +48,9 @@ public class CMClientApp extends JFrame {
     private WatchKey watchkey;
     private static String user_path;
 
+    // For synchronization using logical clock and file sharing
+    private Hashtable<String, SyncFile> HT;
+
     public CMClientApp() {
         MyKeyListener cmKeyListener = new MyKeyListener();
         MyActionListener cmActionListener = new MyActionListener();
@@ -63,8 +61,9 @@ public class CMClientApp extends JFrame {
         setLayout(new BorderLayout());
 
         //Table init
-        header = new String[] {"Name", "Size", "Lclock"};
+        header = new String[] {"Name", "Size", "Logical Clock", "Shared Users"};
         contents = new ArrayList<String[]>();
+        HT = new Hashtable<String, SyncFile>();
 
         m_outTextPane = new JTextPane();
         m_outTextPane.setBackground(new Color(245, 245, 245));
@@ -351,6 +350,17 @@ public class CMClientApp extends JFrame {
             user_path = System.getProperty("user.dir");
             user_path += "\\client-file-path\\" + username;
 
+            // Create the directory if it does not exist
+            File folder = new File(user_path);
+            if(!folder.exists()) {
+                try {
+                    folder.mkdir();
+                    printMessage(" Created a new folder with your username in the client.\n");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
             try {
                 startWatchService();
             } catch(IOException e) {
@@ -571,10 +581,33 @@ public class CMClientApp extends JFrame {
                     Path paths = (Path)event.context();
 
                     if(kind.equals(StandardWatchEventKinds.ENTRY_CREATE)) {
-                        printMessage("Created a file " + paths.getFileName() + " in the directory\n");
+                        String name = paths.getFileName().toString();
+                        long size = 0;
+
+                        try {
+                            size = Files.size(Path.of(user_path + "\\" + paths.getFileName()));
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        SyncFile myFile = new SyncFile(name, size);
+                        HT.put(name, myFile);
+                        printMessage("Created a file " + name + " in the directory\n");
                         getFileDir();
                     } else if(kind.equals(StandardWatchEventKinds.ENTRY_MODIFY)) {
                         printMessage("Modified the file " + paths.getFileName() + " in the directory\n");
+                        String name = paths.getFileName().toString();
+                        long size = 0;
+
+                        try {
+                            size = Files.size(Path.of(user_path + "\\" + paths.getFileName()));
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        HT.get(name).updateSize(size);
+                        HT.get(name).updateFile();
+
+                        printMessage("Updated " + name + ", with logical clock " + HT.get(name).lclock + "\n");
                         getFileDir();
                     } else if(kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
                         printMessage("Deleted the file " + paths.getFileName() + " in the directory\n");
@@ -672,8 +705,42 @@ public class CMClientApp extends JFrame {
         }
     }
 
-    public static void main(String[] args) {
+    public class SyncFile {
+        public ArrayList<String> sharedUsers;
+        public int lclock;
 
+        public String fileName;
+        public long fileSize;
+
+        public SyncFile() {
+            sharedUsers = new ArrayList<String>();
+            sharedUsers.add(m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName());
+            lclock = 0;
+        }
+
+        public SyncFile(String name, long size) {
+            sharedUsers = new ArrayList<String>();
+            sharedUsers.add(m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName());
+            lclock = 0;
+            fileName = name;
+            fileSize = size;
+        }
+
+        // should be called before synchronization
+        public void updateFile() {
+            lclock++;
+        }
+
+        public void shareFile(String usr) {
+            sharedUsers.add(usr);
+        }
+
+        public void updateSize(long size) {
+            fileSize = size;
+        }
+    }
+
+    public static void main(String[] args) {
         CMClientApp client = new CMClientApp();
         CMClientStub clientStub = client.getClientStub();
         clientStub.setAppEventHandler(client.getClientEventHandler());
