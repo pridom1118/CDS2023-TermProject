@@ -1,7 +1,9 @@
+import kr.ac.konkuk.ccslab.cm.entity.CMUser;
 import kr.ac.konkuk.ccslab.cm.event.*;
 import kr.ac.konkuk.ccslab.cm.event.handler.CMAppEventHandler;
 import kr.ac.konkuk.ccslab.cm.info.CMFileTransferInfo;
 import kr.ac.konkuk.ccslab.cm.info.CMInfo;
+import kr.ac.konkuk.ccslab.cm.info.CMInteractionInfo;
 import kr.ac.konkuk.ccslab.cm.stub.CMServerStub;
 
 import java.io.IOException;
@@ -236,8 +238,20 @@ public class CMServerEventHandler implements CMAppEventHandler {
 
                     m_serverStub.requestFile(sender + "\\" + msgPayload[1], sender, CMInfo.FILE_DEFAULT);
 
-                    for(String u: sharedUsers) {
-                        
+                    //if there are shared users
+                    if(sharedUsers.length > 1) {
+                        for(String u: sharedUsers) {
+                            if(!u.equals(sender)) {
+                                CMInteractionInfo interInfo = m_serverStub.getCMInfo().getInteractionInfo();
+                                CMUser myself = interInfo.getMyself();
+                                CMDummyEvent syncEvent = new CMDummyEvent();
+                                syncEvent.setHandlerSession(myself.getCurrentSession());
+                                syncEvent.setHandlerGroup(myself.getCurrentGroup());
+                                syncEvent.setDummyInfo(due.getDummyInfo());
+
+                                m_serverStub.send(syncEvent, u);
+                            }
+                        }
                     }
                 } else System.out.println(msgPayload[1] + " is outdated!");
                 break;
@@ -260,6 +274,4 @@ public class CMServerEventHandler implements CMAppEventHandler {
         }
         return;
     }
-
-
 }

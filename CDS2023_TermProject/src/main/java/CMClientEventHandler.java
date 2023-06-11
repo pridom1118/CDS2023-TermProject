@@ -1,3 +1,4 @@
+import kr.ac.konkuk.ccslab.cm.entity.CMUser;
 import kr.ac.konkuk.ccslab.cm.event.*;
 import kr.ac.konkuk.ccslab.cm.event.filesync.CMFileSyncEvent;
 import kr.ac.konkuk.ccslab.cm.event.handler.CMAppEventHandler;
@@ -10,6 +11,7 @@ import kr.ac.konkuk.ccslab.cm.stub.CMClientStub;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.*;
 
 public class CMClientEventHandler implements CMAppEventHandler {
     private CMClientStub m_clientStub;
@@ -55,6 +57,7 @@ public class CMClientEventHandler implements CMAppEventHandler {
 
     private void processSessionEvent(CMEvent cme) {
         CMSessionEvent se = (CMSessionEvent) cme;
+        String strFilePath = System.getProperty("user.dir") + "\\client-file-path\\";
         switch(se.getID()) {
             case CMSessionEvent.LOGIN_ACK:
                 if (se.isValidUser() == 0)
@@ -64,9 +67,10 @@ public class CMClientEventHandler implements CMAppEventHandler {
                 else {
                     printMessage("This client successfully logs in to the default server.\n");
                     CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
+                    strFilePath += interInfo.getMyself().getName();
                     m_client.setTitle("CM Client [" + interInfo.getMyself().getName() + "]");
                     m_client.setButtonsAccordingToClientState();
-
+                    m_clientStub.setTransferedFileHome(Paths.get(strFilePath));
                     try {
                         m_client.initFileDir();
                         m_client.startWatchService();
@@ -168,6 +172,70 @@ public class CMClientEventHandler implements CMAppEventHandler {
     private void processDummyEvent(CMEvent cme) {
         CMDummyEvent due = (CMDummyEvent) cme;
 
+        //Process the message
+        // [mode / filename / size / lclock / sharedUsers]
+        String[] msgPayload = due.getDummyInfo().split("/");
+        String[] sharedUsers = msgPayload[4].split("\n");
+        String sender = due.getSender();
+        String myName = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
+        long size = Long.parseLong(msgPayload[2]);
+        int lclock = Integer.parseInt(msgPayload[3]);
+        String strPath = System.getProperty("user.dir") + "\\client-file-path\\" + myName + "\\" + msgPayload[1];
+        Path filePath = Paths.get(strPath);
+
+        System.out.println("\nGot sync message from: " + sender);
+
+        //at this point
+        switch(msgPayload[0]) {
+            case "share":
+                printMessage("File Share from user: " + sender + "\n");
+                printMessage(msgPayload[1] + " shared!\n");
+
+                printMessage("Shared users: ");
+                for(String u: sharedUsers) {
+                    printMessage(u + "\n");
+                }
+
+                SyncFile myFile = new SyncFile(msgPayload[1], size, lclock, sharedUsers);
+                m_client.HT.put(msgPayload[1], myFile);
+                m_client.getFileDir();
+                break;
+            case "update":
+                printMessage("File Sync from server: Updating the file " + msgPayload[1] + "\n");
+                try {
+                    Files.delete(filePath);
+                    System.out.println(sender + " just deleted the file " + msgPayload[1]);
+                } catch(NoSuchFileException e) {
+                    System.out.println("File " + msgPayload[1] + " does not exist.");
+                } catch(IOException e) {
+                    e.printStackTrace();
+                }
+
+                SyncFile syncFile = new SyncFile(msgPayload[1], size, lclock, sharedUsers);
+                m_client.HT.put(msgPayload[1], syncFile);
+                m_clientStub.requestFile(sharedUsers[0] + "\\" + msgPayload[1], sender, CMInfo.FILE_DEFAULT);
+                printMessage("Successfully synchronized the file: " + msgPayload[1] + " with lclock value " + msgPayload[3] + "\n");
+                m_client.getFileDir();
+                break;
+            case "delete":
+                printMessage("FileSync: file" + msgPayload[1] + " deleted\n");
+                try {
+                    Files.delete(filePath);
+                    System.out.println(sender + " just deleted the file " + msgPayload[1]);
+                    m_client.HT.remove(msgPayload[1]);
+                    printMessage("Deleted the shared file: " + msgPayload[1] + "\n");
+                    m_client.getFileDir();
+                } catch(NoSuchFileException e) {
+                    System.out.println("File " + msgPayload[1] + " does not exist.");
+                } catch(IOException e) {
+                    e.printStackTrace();
+                }
+                break;
+            default:
+                System.err.println("Error while processing the sync message!");
+                break;
+        }
+        return;
     }
 
     public void setReqAttachedFile(boolean bReq) {

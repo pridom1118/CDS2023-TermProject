@@ -51,7 +51,7 @@ public class CMClientApp extends JFrame {
     public static String user_path;
 
     // For synchronization using logical clock and file sharing
-    private Hashtable<String, SyncFile> HT;
+    public Hashtable<String, SyncFile> HT;
 
     public CMClientApp() {
         MyKeyListener cmKeyListener = new MyKeyListener();
@@ -477,7 +477,44 @@ public class CMClientApp extends JFrame {
     }
 
     private void shareFile() {
+        String filename = null;
+        String[] users = null;
+        String myName = m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName();
+        boolean ret = false;
+        JTextField fileNameField = new JTextField();
+        JTextField userNameField = new JTextField();
 
+        Object[] message = {
+                "A file you want to share:", fileNameField,
+                "Users whom you want to share with:", userNameField
+        };
+
+        int option = JOptionPane.showConfirmDialog(null, message, "File Share", JOptionPane.OK_CANCEL_OPTION);
+
+        if(option == JOptionPane.OK_OPTION) {
+            filename = fileNameField.getText();
+            users = userNameField.getText().split("/");
+            SyncFile syncFile = HT.get(filename);
+            String strFilePath = System.getProperty("user.dir") + "\\client-file-path\\" + myName + "\\";
+
+            if(syncFile != null) {
+                for(String u: users) {
+                    syncFile.shareFile(u);
+                }
+
+                HT.replace(filename, syncFile);
+
+                for(String u: users) {
+                    printMessage("Successfully shared a file with " + u + "\n");
+                    m_clientStub.pushFile(strFilePath + filename, u, CMInfo.FILE_DEFAULT);
+                    sendFileSyncMessage("share", syncFile.getValue(), u);
+                }
+
+                getFileDir();
+            } else {
+                printMessage("The file " + filename + " does not exist\n");
+            }
+        }
     }
 
     // adds a row to the file table
@@ -503,7 +540,7 @@ public class CMClientApp extends JFrame {
         }
     }
 
-    private void sendFileSyncMessage(String mode, String[] fileInfo) {
+    private void sendFileSyncMessage(String mode, String[] fileInfo, String receiver) {
         CMInteractionInfo interInfo = m_clientStub.getCMInfo().getInteractionInfo();
         CMUser myself = interInfo.getMyself();
         String username = myself.getName();
@@ -519,7 +556,7 @@ public class CMClientApp extends JFrame {
         String msg = mode + "/" + fileInfo[0] + "/" + fileInfo[1] + "/" + fileInfo[2] + "/" + fileInfo[3];
         syncEvent.setDummyInfo(msg);
 
-        m_clientStub.send(syncEvent, "SERVER");
+        m_clientStub.send(syncEvent, receiver);
     }
 
     public void printCurrentFileInfo() {
@@ -556,7 +593,7 @@ public class CMClientApp extends JFrame {
             for(int i = 0; i < filenames.length; i++) {
                 SyncFile tmp = HT.get(filenames[i]);
                 if(tmp == null) continue;
-                addFileRow(tmp.getValue());
+                addFileRow(tmp.getRowValue());
             }
         }
     }
@@ -573,7 +610,7 @@ public class CMClientApp extends JFrame {
             for(int i = 0; i < files.length; i++) {
                 String name = files[i].getName();
                 String size = String.valueOf(files[i].length());
-                HT.put(name, new SyncFile(files[i].getName(), files[i].length()));
+                HT.put(name, new SyncFile(files[i].getName(), files[i].length(), username));
                 addFileRow(new String[]{name, size, "0", username });
             }
         }
@@ -626,11 +663,11 @@ public class CMClientApp extends JFrame {
                             e.printStackTrace();
                         }
 
-                        SyncFile myFile = new SyncFile(name, size);
+                        SyncFile myFile = new SyncFile(name, size, interInfo.getMyself().getName());
                         HT.put(name, myFile);
                         printMessage("Created a file " + name + " in the directory\n");
                         byteFileAppendMode = CMInfo.FILE_DEFAULT;
-                        sendFileSyncMessage("create", myFile.getValue());
+                        sendFileSyncMessage("create", myFile.getValue(), "SERVER");
                         getFileDir();
 
                         boolean ret = m_clientStub.pushFile(strFilePath, "SERVER", byteFileAppendMode);
@@ -652,11 +689,11 @@ public class CMClientApp extends JFrame {
                         HT.replace(name, tempFile);
 
                         printMessage("Updated " + name + ", with logical clock " + HT.get(name).lclock + "\n");
-                        sendFileSyncMessage("update", HT.get(name).getValue());
+                        sendFileSyncMessage("update", HT.get(name).getValue(), "SERVER");
                         getFileDir();
                     } else if(kind.equals(StandardWatchEventKinds.ENTRY_DELETE)) {
                         printMessage("Deleted the file " + paths.getFileName() + " in the directory\n");
-                        sendFileSyncMessage("delete", HT.get(name).getValue());
+                        sendFileSyncMessage("delete", HT.get(name).getValue(), "SERVER");
                         HT.remove(paths.getFileName().toString());
                         getFileDir();
                     } else {
@@ -754,53 +791,6 @@ public class CMClientApp extends JFrame {
             else if(button.getText().equals("File Upload")) pushFile();
             else if(button.getText().equals("File Share")) shareFile();
             else if(button.getText().equals("Refresh")) refreshUI();
-        }
-    }
-
-    public class SyncFile {
-        public ArrayList<String> sharedUsers;
-        public int lclock;
-
-        public String fileName;
-        public long fileSize;
-
-        public SyncFile() {
-            sharedUsers = new ArrayList<String>();
-            sharedUsers.add(m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName());
-            lclock = 0;
-        }
-
-        public SyncFile(String name, long size) {
-            sharedUsers = new ArrayList<String>();
-            sharedUsers.add(m_clientStub.getCMInfo().getInteractionInfo().getMyself().getName());
-            lclock = 0;
-            fileName = name;
-            fileSize = size;
-        }
-
-        // should be called before synchronization
-        public void updateFile() {
-            lclock++;
-        }
-
-        public void shareFile(String usr) {
-            sharedUsers.add(usr);
-        }
-
-        public void updateSize(long size) {
-            fileSize = size;
-        }
-
-        public String[] getValue() {
-            String usrs = "";
-
-            for(String u: sharedUsers) {
-                usrs += u + "\n";
-            }
-            usrs = usrs.substring(0, usrs.length()-1);
-
-            String[] ret = { fileName, String.valueOf(fileSize), String.valueOf(lclock), usrs };
-            return ret;
         }
     }
 
