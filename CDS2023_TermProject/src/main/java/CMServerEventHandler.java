@@ -236,7 +236,7 @@ public class CMServerEventHandler implements CMAppEventHandler {
                         e.printStackTrace();
                     }
 
-                    m_serverStub.requestFile(sender + "\\" + msgPayload[1], sender, CMInfo.FILE_DEFAULT);
+                    m_serverStub.requestFile(msgPayload[1], sender, CMInfo.FILE_DEFAULT);
 
                     //if there are shared users
                     if(sharedUsers.length > 1) {
