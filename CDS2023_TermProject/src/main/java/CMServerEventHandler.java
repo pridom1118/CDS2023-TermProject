@@ -229,7 +229,6 @@ public class CMServerEventHandler implements CMAppEventHandler {
                     try {
                         Files.delete(filePath);
                         System.out.println(sender + " just deleted the file " + msgPayload[1]);
-                        fileHashTable.remove(msgPayload[1]);
                     } catch(NoSuchFileException e) {
                         System.out.println("File " + msgPayload[1] + " does not exist.");
                     } catch(IOException e) {
